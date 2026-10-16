@@ -127,17 +127,19 @@ export function Label({ children, help, htmlFor }: { children: ReactNode; help?:
   );
 }
 
+// Width is applied separately so a caller's w-* class always wins.
+const widthOf = (className?: string) => (/(^|\s)w-/.test(className ?? "") ? "" : "w-full");
 const inputCls =
-  "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-400 focus:ring-4 focus:ring-zinc-100";
+  "rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-400 focus:ring-4 focus:ring-zinc-100";
 
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cn(inputCls, "h-10", props.className)} />;
+  return <input {...props} className={cn(inputCls, widthOf(props.className), "h-10", props.className)} />;
 }
 export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} className={cn(inputCls, "min-h-[96px] resize-y leading-relaxed", props.className)} />;
+  return <textarea {...props} className={cn(inputCls, widthOf(props.className), "min-h-[96px] resize-y leading-relaxed", props.className)} />;
 }
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...props} className={cn(inputCls, "h-10 pr-8", props.className)} />;
+  return <select {...props} className={cn(inputCls, widthOf(props.className), "h-10 pr-8", props.className)} />;
 }
 
 export function Toggle({ checked, onChange, label, help }: { checked: boolean; onChange: (v: boolean) => void; label?: string; help?: string }) {

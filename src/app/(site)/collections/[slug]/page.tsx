@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { ProductCard } from "@/components/site/ProductCard";
 import { ParallaxImage, Reveal, SplitText } from "@/components/site/motion";
 import { db } from "@/lib/db";
-import { toProductView } from "@/lib/types";
+import { viewProducts } from "@/lib/catalog";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -17,6 +17,7 @@ export default async function CollectionPage({ params }: Props) {
   const { slug } = await params;
   const c = await db.collection.findUnique({ where: { slug }, include: { products: { where: { published: true }, orderBy: { sortOrder: "asc" } } } });
   if (!c) notFound();
+  const products = await viewProducts(c.products.map((p) => ({ ...p, collection: c })));
   return (
     <div className="pb-28">
       <div className="relative h-[85svh] min-h-[560px] overflow-hidden text-white">
@@ -36,8 +37,8 @@ export default async function CollectionPage({ params }: Props) {
         </Reveal>
       </div>
       <div className="site-container grid grid-cols-2 gap-x-4 gap-y-14 md:gap-x-6 lg:grid-cols-3">
-        {c.products.map((p, i) => (
-          <ProductCard key={p.id} product={toProductView({ ...p, collection: c })} index={i} size="lg" />
+        {products.map((p, i) => (
+          <ProductCard key={p.id} product={p} index={i} size="lg" />
         ))}
       </div>
     </div>

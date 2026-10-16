@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BarChart3, Code2, CreditCard, Mail, MessageCircle, Plus, Send, Trash2, TrendingUp, Webhook } from "lucide-react";
+import { BarChart3, Code2, CreditCard, Mail, MessageCircle, Plus, Send, Trash2, TrendingUp, Truck, Webhook } from "lucide-react";
 import { saveIntegrations, testRatesApi, testWebhook } from "@/app/admin/actions";
 import type { Integrations } from "@/lib/settings-types";
 import { Badge, Button, Card, Input, Label, Select, Textarea, Toggle, useAction } from "./ui";
@@ -12,6 +12,9 @@ const EVENTS = [
   { value: "order.paid", label: "Order paid" },
   { value: "inquiry.created", label: "Inquiry received" },
   { value: "newsletter.subscribed", label: "Newsletter sign-up" },
+  { value: "review.created", label: "Review submitted" },
+  { value: "return.created", label: "Return requested" },
+  { value: "appointment.created", label: "Appointment requested" },
 ];
 
 function Section({ icon: Icon, title, description, status, children }: { icon: typeof Mail; title: string; description: string; status?: boolean; children: React.ReactNode }) {
@@ -63,53 +66,83 @@ export function IntegrationsEditor({ initial }: { initial: Integrations }) {
         </div>
       </Section>
 
-      <Section icon={TrendingUp} title="Live metal rates" description="Gold & silver rates scrolling in the top bar — manual, or from any JSON API." status={v.ratesEnabled}>
-        <div className="space-y-4">
-          <Toggle label="Show rates ticker" checked={v.ratesEnabled} onChange={(x) => set("ratesEnabled", x)} />
+      <Section icon={TrendingUp} title="Metal rates" description="Per-gram rates drive live product pricing and the top ticker. Enter them daily, or pull them from any JSON API." status={v.ratesEnabled}>
+        <div className="space-y-5">
+          <Toggle label="Show rates ticker in the top bar" checked={v.ratesEnabled} onChange={(x) => set("ratesEnabled", x)} />
+          <div className="overflow-hidden rounded-xl border border-zinc-200">
+            <table className="w-full text-sm">
+              <thead className="bg-zinc-50 text-left text-xs text-zinc-500">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Key</th>
+                  <th className="px-3 py-2 font-medium">Label</th>
+                  <th className="px-3 py-2 font-medium">₹ per gram</th>
+                  <th className="px-3 py-2 font-medium">Ticker</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {v.metalRates.map((r, i) => (
+                  <tr key={i}>
+                    <td className="px-3 py-2">
+                      <Input value={r.key} onChange={(e) => set("metalRates", v.metalRates.map((x, k) => (k === i ? { ...x, key: e.target.value.replace(/[^a-z0-9_]/gi, "").toLowerCase() } : x)))} className="h-9 w-28 font-mono text-xs" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Input value={r.label} onChange={(e) => set("metalRates", v.metalRates.map((x, k) => (k === i ? { ...x, label: e.target.value } : x)))} className="h-9" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Input type="number" step="any" min={0} value={r.perGram} onChange={(e) => set("metalRates", v.metalRates.map((x, k) => (k === i ? { ...x, perGram: Number(e.target.value) } : x)))} className="h-9 w-32" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Toggle checked={r.showInTicker} onChange={(x) => set("metalRates", v.metalRates.map((y, k) => (k === i ? { ...y, showInTicker: x } : y)))} />
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <Button variant="ghost" size="sm" onClick={() => set("metalRates", v.metalRates.filter((_, k) => k !== i))}>
+                        <Trash2 size={13} />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => set("metalRates", [...v.metalRates, { key: "", label: "", perGram: 0, showInTicker: false }])}>
+            <Plus size={13} /> Add metal
+          </Button>
           <div>
-            <Label>Source</Label>
+            <Label help="With an API, these values are overwritten every 10 minutes; the numbers above are the fallback.">Source</Label>
             <Select value={v.ratesSource} onChange={(e) => set("ratesSource", e.target.value as Integrations["ratesSource"])}>
-              <option value="manual">Manual — I'll type today's rates</option>
-              <option value="api">External API</option>
+              <option value="manual">Manual — I update the rates above</option>
+              <option value="api">External API (e.g. metals-api, goldapi.io, your ERP)</option>
             </Select>
           </div>
-          {v.ratesSource === "manual" ? (
-            <div className="space-y-2">
-              {v.manualRates.map((r, i) => (
-                <div key={i} className="flex gap-2">
-                  <Input value={r.label} placeholder="Gold 22K" onChange={(e) => set("manualRates", v.manualRates.map((x, k) => (k === i ? { ...x, label: e.target.value } : x)))} />
-                  <Input value={r.value} placeholder="₹7,190/g" onChange={(e) => set("manualRates", v.manualRates.map((x, k) => (k === i ? { ...x, value: e.target.value } : x)))} />
-                  <Button variant="ghost" onClick={() => set("manualRates", v.manualRates.filter((_, k) => k !== i))}>
-                    <Trash2 size={14} />
-                  </Button>
-                </div>
-              ))}
-              <Button size="sm" variant="secondary" onClick={() => set("manualRates", [...v.manualRates, { label: "", value: "" }])}>
-                <Plus size={13} /> Add rate
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
+          {v.ratesSource === "api" && (
+            <div className="space-y-4 rounded-xl bg-zinc-50 p-4">
               {text("ratesApiUrl", "API URL (GET, returns JSON)", { placeholder: "https://api.example.com/v1/rates?base=INR" })}
               <div className="grid gap-4 sm:grid-cols-2">
-                {text("ratesApiHeaderName", "Auth header name", { placeholder: "x-api-key" })}
+                {text("ratesApiHeaderName", "Auth header name", { placeholder: "x-access-token" })}
                 {text("ratesApiHeaderValue", "Auth header value", { secret: true })}
               </div>
               <div>
-                <Label help="Dot-paths into the JSON response, e.g. data.gold.24k">Field mapping</Label>
+                <Label help="Dot-path into the JSON and a multiplier to convert to ₹ per gram (e.g. 0.1 if the API returns per 10 g).">Field mapping</Label>
                 <div className="space-y-2">
                   {v.ratesApiMap.map((m, i) => (
                     <div key={i} className="flex gap-2">
-                      <Input value={m.label} placeholder="Label" onChange={(e) => set("ratesApiMap", v.ratesApiMap.map((x, k) => (k === i ? { ...x, label: e.target.value } : x)))} />
-                      <Input value={m.path} placeholder="rates.gold24" className="font-mono" onChange={(e) => set("ratesApiMap", v.ratesApiMap.map((x, k) => (k === i ? { ...x, path: e.target.value } : x)))} />
-                      <Input value={m.suffix} placeholder="/g" className="w-24" onChange={(e) => set("ratesApiMap", v.ratesApiMap.map((x, k) => (k === i ? { ...x, suffix: e.target.value } : x)))} />
+                      <Select value={m.key} onChange={(e) => set("ratesApiMap", v.ratesApiMap.map((x, k) => (k === i ? { ...x, key: e.target.value } : x)))} className="w-40">
+                        {v.metalRates.map((r) => (
+                          <option key={r.key} value={r.key}>
+                            {r.label}
+                          </option>
+                        ))}
+                      </Select>
+                      <Input value={m.path} placeholder="data.gold.24k" className="font-mono" onChange={(e) => set("ratesApiMap", v.ratesApiMap.map((x, k) => (k === i ? { ...x, path: e.target.value } : x)))} />
+                      <Input type="number" step="any" value={m.multiplier} className="w-24" onChange={(e) => set("ratesApiMap", v.ratesApiMap.map((x, k) => (k === i ? { ...x, multiplier: Number(e.target.value) } : x)))} />
                       <Button variant="ghost" onClick={() => set("ratesApiMap", v.ratesApiMap.filter((_, k) => k !== i))}>
                         <Trash2 size={14} />
                       </Button>
                     </div>
                   ))}
-                  <Button size="sm" variant="secondary" onClick={() => set("ratesApiMap", [...v.ratesApiMap, { label: "", path: "", suffix: "/g" }])}>
-                    <Plus size={13} /> Add field
+                  <Button size="sm" variant="secondary" onClick={() => set("ratesApiMap", [...v.ratesApiMap, { key: v.metalRates[0]?.key ?? "gold24", path: "", multiplier: 1 }])}>
+                    <Plus size={13} /> Add mapping
                   </Button>
                 </div>
               </div>
@@ -129,6 +162,40 @@ export function IntegrationsEditor({ initial }: { initial: Integrations }) {
               </div>
             </div>
           )}
+        </div>
+      </Section>
+
+      <Section icon={MessageCircle} title="SMS" description="OTP sign-in by mobile and order / appointment updates by SMS." status={v.smsProvider !== "none"}>
+        <div className="space-y-4">
+          <div>
+            <Label>Provider</Label>
+            <Select value={v.smsProvider} onChange={(e) => set("smsProvider", e.target.value as Integrations["smsProvider"])}>
+              <option value="none">Off</option>
+              <option value="fast2sms">Fast2SMS (India)</option>
+              <option value="twilio">Twilio</option>
+            </Select>
+          </div>
+          {v.smsProvider === "twilio" && (
+            <div className="grid gap-4 sm:grid-cols-3">
+              {text("twilioSid", "Account SID")}
+              {text("twilioToken", "Auth token", { secret: true })}
+              {text("twilioFrom", "From number", { placeholder: "+1…" })}
+            </div>
+          )}
+          {v.smsProvider === "fast2sms" && text("fast2smsKey", "API key", { secret: true, help: "Fast2SMS → Dev API. Indian DLT rules may require a registered template for transactional SMS." })}
+        </div>
+      </Section>
+
+      <Section icon={Truck} title="Shiprocket" description="Live PIN-code serviceability, one-click shipments with AWB, and live tracking for customers." status={v.shiprocketEnabled && !!v.shiprocketEmail}>
+        <div className="space-y-4">
+          <Toggle label="Enable Shiprocket" checked={v.shiprocketEnabled} onChange={(x) => set("shiprocketEnabled", x)} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            {text("shiprocketEmail", "API user email", { help: "Create an API user in Shiprocket → Settings → API." })}
+            {text("shiprocketPassword", "API user password", { secret: true })}
+            {text("shiprocketPickupLocation", "Pickup location name", { placeholder: "Primary" })}
+            {text("shiprocketPickupPincode", "Pickup PIN code")}
+          </div>
+          <p className="text-xs text-zinc-500">Set Delivery mode to “Shiprocket” in Store settings to use live serviceability at checkout.</p>
         </div>
       </Section>
 

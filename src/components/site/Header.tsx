@@ -4,9 +4,10 @@ import { AnimatePresence, motion, useMotionValueEvent, useScroll } from "framer-
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Search, X } from "lucide-react";
+import { Heart, Search, User, X } from "lucide-react";
 import type { NavLink } from "@/lib/settings-types";
 import { cn } from "@/lib/utils";
+import { useAccount } from "./Account";
 import { useCart } from "./Cart";
 import { useSite } from "./SiteProvider";
 import { useLenis } from "./SmoothScroll";
@@ -14,6 +15,7 @@ import { useLenis } from "./SmoothScroll";
 export function Header({ links, ticker }: { links: NavLink[]; ticker: string[] }) {
   const site = useSite();
   const { count, setOpen } = useCart();
+  const { wishlist, customer } = useAccount();
   const pathname = usePathname();
   const { scrollY } = useScroll();
   const [scrolled, setScrolled] = useState(false);
@@ -93,6 +95,13 @@ export function Header({ links, ticker }: { links: NavLink[]; ticker: string[] }
               <button onClick={() => setSearch(true)} aria-label="Search" className="transition-opacity hover:opacity-60">
                 <Search size={17} strokeWidth={1.4} />
               </button>
+              <Link href="/account" aria-label={customer ? "Your account" : "Sign in"} className="hidden transition-opacity hover:opacity-60 sm:block">
+                <User size={17} strokeWidth={1.4} className={customer ? "text-accent" : ""} />
+              </Link>
+              <Link href="/wishlist" aria-label={`Wishlist (${wishlist.length})`} className="relative transition-opacity hover:opacity-60">
+                <Heart size={17} strokeWidth={1.4} />
+                {wishlist.length > 0 && <span className="absolute -right-2 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 text-[9px] text-accent-fg">{wishlist.length}</span>}
+              </Link>
               <button onClick={() => setOpen(true)} className="flex items-center gap-2" aria-label="Open bag">
                 <span className="hidden sm:inline">Bag</span>
                 <span className="grid h-6 min-w-6 place-items-center rounded-full border border-current px-1.5 text-[10px] tabular-nums">{count}</span>
@@ -146,6 +155,12 @@ function MobileMenu({ links, onClose }: { links: NavLink[]; onClose: () => void 
           </div>
         ))}
       </nav>
+      <motion.div className="site-container flex flex-wrap gap-x-6 gap-y-2 pb-4 text-[12px] uppercase tracking-[0.16em]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}>
+        <Link href="/account" onClick={onClose}>Account</Link>
+        <Link href="/wishlist" onClick={onClose}>Wishlist</Link>
+        <Link href="/track" onClick={onClose}>Track order</Link>
+        <Link href="/book" onClick={onClose}>Book appointment</Link>
+      </motion.div>
       <motion.div className="site-container pb-8 text-sm text-dark-fg/60" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }}>
         <p>{site.email}</p>
         <p>{site.phone}</p>

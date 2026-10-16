@@ -2,10 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { FileText, Plus, Trash2 } from "lucide-react";
 import { bulkProducts, saveProduct, type ProductInput } from "@/app/admin/actions";
-import { slugify } from "@/lib/utils";
-import { ImagesField } from "./fields";
+import { computePrice, DEFAULT_PRICING, type PricingConfig } from "@/lib/pricing";
+import type { MetalRate } from "@/lib/settings-types";
+import { formatPrice, slugify } from "@/lib/utils";
+import { ImagesField, MediaPicker } from "./fields";
 import { Button, Card, Input, Label, PageTitle, Select, Textarea, Toggle, useAction } from "./ui";
 
 const EMPTY: ProductInput = {
@@ -32,9 +34,18 @@ const EMPTY: ProductInput = {
   published: true,
   sortOrder: 0,
   collectionId: "",
+  pricing: DEFAULT_PRICING,
+  certificateLab: "",
+  certificateNo: "",
+  certificateUrl: "",
+  huid: "",
+  hsnCode: "7113",
+  tryAtHome: true,
 };
 
-export function ProductForm({ id, initial, collections }: { id: string | null; initial?: ProductInput; collections: { id: string; name: string }[] }) {
+type Env = { rates: MetalRate[]; gstPercent: number; ringSizes: string[] };
+
+export function ProductForm({ id, initial, collections, env }: { id: string | null; initial?: ProductInput; collections: { id: string; name: string }[]; env: Env }) {
   const router = useRouter();
   const { run, pending } = useAction();
   const [v, setV] = useState<ProductInput>(initial ?? EMPTY);
@@ -124,6 +135,8 @@ export function ProductForm({ id, initial, collections }: { id: string | null; i
             <ImagesField value={v.images} onChange={(imgs) => set("images", imgs)} />
           </Card>
 
+          <PricingCard value={v.pricing} basePrice={v.price} env={env} onChange={(pricing) => set("pricing", pricing)} />
+
           <Card title="Specifications">
             <div className="grid gap-5 sm:grid-cols-2">
               <div>
@@ -173,7 +186,7 @@ export function ProductForm({ id, initial, collections }: { id: string | null; i
           <Card title="Pricing & stock">
             <div className="space-y-4">
               <div>
-                <Label>Price</Label>
+                <Label help={v.pricing.mode === "rate" ? "Ignored — calculated live from metal rates." : "GST inclusive base price."}>Price</Label>
                 <Input type="number" min={0} step="any" required value={v.price} onChange={(e) => set("price", Number(e.target.value))} />
               </div>
               <div>
@@ -184,6 +197,42 @@ export function ProductForm({ id, initial, collections }: { id: string | null; i
                 <Label help="At 0 the piece shows as 'made to order'.">Stock</Label>
                 <Input type="number" value={v.stock} onChange={(e) => set("stock", Number(e.target.value))} />
               </div>
+            </div>
+          </Card>
+          <Card title="Certification & hallmark" description="Shown on the product page with verify links.">
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Lab</Label>
+                  <Select value={v.certificateLab ?? ""} onChange={(e) => set("certificateLab", e.target.value)}>
+                    <option value="">—</option>
+                    <option>IGI</option>
+                    <option>GIA</option>
+                    <option>SGL</option>
+                    <option>HRD</option>
+                    <option>GII</option>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Report no.</Label>
+                  <Input value={v.certificateNo ?? ""} onChange={(e) => set("certificateNo", e.target.value)} />
+                </div>
+              </div>
+              <div>
+                <Label>Certificate file (PDF / image)</Label>
+                <FileField value={v.certificateUrl ?? ""} onChange={(x) => set("certificateUrl", x)} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label help="6-character BIS code">HUID</Label>
+                  <Input value={v.huid ?? ""} maxLength={6} onChange={(e) => set("huid", e.target.value.toUpperCase())} className="font-mono uppercase" />
+                </div>
+                <div>
+                  <Label>HSN code</Label>
+                  <Input value={v.hsnCode ?? ""} onChange={(e) => set("hsnCode", e.target.value)} />
+                </div>
+              </div>
+              <Toggle label="Offer try-at-home & video call" checked={v.tryAtHome} onChange={(x) => set("tryAtHome", x)} />
             </div>
           </Card>
           <Card title="Organisation">
@@ -212,5 +261,185 @@ export function ProductForm({ id, initial, collections }: { id: string | null; i
         </div>
       </div>
     </form>
+  );
+}
+
+function FileField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="/uploads/certificate.pdf" />
+        <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
+          <FileText size={14} />
+        </Button>
+      </div>
+      {value && (
+        <a href={value} target="_blank" className="text-xs text-zinc-500 underline">
+          Open file
+        </a>
+      )}
+      <MediaPicker open={open} onClose={() => setOpen(false)} onPick={onChange} />
+    </div>
+  );
+}
+
+function PricingCard({ value, onChange, basePrice, env }: { value: PricingConfig; onChange: (v: PricingConfig) => void; basePrice: number; env: Env }) {
+  const set = <K extends keyof PricingConfig>(k: K, x: PricingConfig[K]) => onChange({ ...value, [k]: x });
+  const rateMap = Object.fromEntries(env.rates.map((r) => [r.key, r.perGram]));
+  const preview = computePrice(basePrice, value, rateMap, {}, env.gstPercent);
+  const fmt = (n: number) => formatPrice(n, "INR");
+  return (
+    <Card title="Pricing & variants" description="Fixed price with optional variant surcharges, or live pricing from today's metal rates.">
+      <div className="space-y-6">
+        <div className="grid grid-cols-2 gap-2 rounded-xl bg-zinc-100 p-1 text-sm">
+          {(
+            [
+              ["fixed", "Fixed price"],
+              ["rate", "Live metal rate"],
+            ] as const
+          ).map(([k, l]) => (
+            <button type="button" key={k} onClick={() => set("mode", k)} className={`rounded-lg py-2 font-medium transition ${value.mode === k ? "bg-white shadow-sm" : "text-zinc-500"}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+
+        {value.mode === "rate" && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label help="Net metal weight in grams">Metal weight (g)</Label>
+              <Input type="number" step="any" min={0} value={value.metalWeight} onChange={(e) => set("metalWeight", Number(e.target.value))} />
+            </div>
+            <div>
+              <Label help="Used when no diamond-quality options are set">Stone value (₹)</Label>
+              <Input type="number" min={0} value={value.stoneValue} onChange={(e) => set("stoneValue", Number(e.target.value))} />
+            </div>
+            <div>
+              <Label>Making charges</Label>
+              <Select value={value.makingType} onChange={(e) => set("makingType", e.target.value as PricingConfig["makingType"])}>
+                <option value="percent">% of metal value</option>
+                <option value="perGram">₹ per gram</option>
+                <option value="flat">Flat ₹</option>
+              </Select>
+            </div>
+            <div>
+              <Label>{value.makingType === "percent" ? "Making %" : "Making amount (₹)"}</Label>
+              <Input type="number" step="any" min={0} value={value.makingValue} onChange={(e) => set("makingValue", Number(e.target.value))} />
+            </div>
+          </div>
+        )}
+
+        <div>
+          <Label help={value.mode === "rate" ? "Each metal option uses its own per-gram rate." : "Surcharge (₹) added to the base price; can be negative."}>Metal options</Label>
+          <div className="space-y-2">
+            {value.metals.map((m, i) => (
+              <div key={i} className="flex gap-2">
+                <Input value={m.label} placeholder="18K Yellow Gold" onChange={(e) => set("metals", value.metals.map((x, k) => (k === i ? { ...x, label: e.target.value } : x)))} />
+                <Select value={m.rateKey} onChange={(e) => set("metals", value.metals.map((x, k) => (k === i ? { ...x, rateKey: e.target.value } : x)))} className="w-40">
+                  {env.rates.map((r) => (
+                    <option key={r.key} value={r.key}>
+                      {r.label}
+                    </option>
+                  ))}
+                </Select>
+                {value.mode === "fixed" && <Input type="number" value={m.delta} placeholder="+₹" onChange={(e) => set("metals", value.metals.map((x, k) => (k === i ? { ...x, delta: Number(e.target.value) } : x)))} className="w-32" />}
+                <Button type="button" variant="ghost" onClick={() => set("metals", value.metals.filter((_, k) => k !== i))}>
+                  <Trash2 size={14} />
+                </Button>
+              </div>
+            ))}
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="sm" variant="secondary" onClick={() => set("metals", [...value.metals, { label: "", rateKey: env.rates[0]?.key ?? "gold22", delta: 0 }])}>
+                <Plus size={13} /> Add metal
+              </Button>
+              {value.metals.length === 0 && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() =>
+                    set("metals", [
+                      { label: "18K Yellow Gold", rateKey: "gold18", delta: 0 },
+                      { label: "18K Rose Gold", rateKey: "gold18", delta: 0 },
+                      { label: "18K White Gold", rateKey: "gold18", delta: 0 },
+                    ])
+                  }
+                >
+                  Quick-add 18K yellow / rose / white
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <Label help={value.mode === "rate" ? "Each quality sets the stone value." : "Surcharge (₹) per quality."}>Diamond quality options</Label>
+          <div className="space-y-2">
+            {value.qualities.map((q, i) => (
+              <div key={i} className="flex gap-2">
+                <Input value={q.label} placeholder="VS-GH" onChange={(e) => set("qualities", value.qualities.map((x, k) => (k === i ? { ...x, label: e.target.value } : x)))} />
+                {value.mode === "rate" ? (
+                  <Input type="number" min={0} value={q.stoneValue} placeholder="Stone ₹" onChange={(e) => set("qualities", value.qualities.map((x, k) => (k === i ? { ...x, stoneValue: Number(e.target.value) } : x)))} className="w-40" />
+                ) : (
+                  <Input type="number" value={q.delta} placeholder="+₹" onChange={(e) => set("qualities", value.qualities.map((x, k) => (k === i ? { ...x, delta: Number(e.target.value) } : x)))} className="w-40" />
+                )}
+                <Button type="button" variant="ghost" onClick={() => set("qualities", value.qualities.filter((_, k) => k !== i))}>
+                  <Trash2 size={14} />
+                </Button>
+              </div>
+            ))}
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="sm" variant="secondary" onClick={() => set("qualities", [...value.qualities, { label: "", stoneValue: 0, delta: 0 }])}>
+                <Plus size={13} /> Add quality
+              </Button>
+              {value.qualities.length === 0 && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() =>
+                    set("qualities", [
+                      { label: "SI-IJ", stoneValue: value.stoneValue || 0, delta: 0 },
+                      { label: "VS-GH", stoneValue: Math.round((value.stoneValue || 0) * 1.35), delta: 0 },
+                      { label: "VVS-EF", stoneValue: Math.round((value.stoneValue || 0) * 1.8), delta: 0 },
+                    ])
+                  }
+                >
+                  Quick-add SI-IJ / VS-GH / VVS-EF
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-[180px_1fr]">
+          <div>
+            <Label>Size label</Label>
+            <Input value={value.sizeLabel} onChange={(e) => set("sizeLabel", e.target.value)} placeholder="Ring size" />
+          </div>
+          <div>
+            <Label help="Comma separated. Leave empty if the piece has no sizes.">Sizes</Label>
+            <div className="flex gap-2">
+              <Input value={value.sizes.join(", ")} onChange={(e) => set("sizes", e.target.value.split(",").map((s) => s.trim()).filter((s, i, a) => s !== "" || i === a.length - 1))} placeholder="8, 10, 12, 14" />
+              <Button type="button" variant="secondary" onClick={() => set("sizes", env.ringSizes)}>
+                Ring sizes
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-zinc-950 p-4 text-sm text-zinc-100">
+          <p className="text-xs text-zinc-400">Default variant price (incl. {env.gstPercent}% GST)</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums">{fmt(preview.total)}</p>
+          {value.mode === "rate" && (
+            <p className="mt-2 text-xs text-zinc-400 tabular-nums">
+              Metal {fmt(preview.metal)} + stones {fmt(preview.stone)} + making {fmt(preview.making)} + GST {fmt(preview.gst)}
+            </p>
+          )}
+          {value.mode === "rate" && value.metalWeight === 0 && <p className="mt-2 text-xs text-amber-400">Add a metal weight to enable live-rate pricing.</p>}
+        </div>
+      </div>
+    </Card>
   );
 }

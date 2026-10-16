@@ -169,6 +169,23 @@ const productInput = z.object({
   published: z.boolean(),
   sortOrder: z.coerce.number().int(),
   collectionId: z.string().optional().nullable(),
+  pricing: z.object({
+    mode: z.enum(["fixed", "rate"]),
+    metalWeight: z.coerce.number().min(0),
+    stoneValue: z.coerce.number().min(0),
+    makingType: z.enum(["percent", "perGram", "flat"]),
+    makingValue: z.coerce.number().min(0),
+    metals: z.array(z.object({ label: z.string().min(1), rateKey: z.string(), delta: z.coerce.number() })),
+    qualities: z.array(z.object({ label: z.string().min(1), stoneValue: z.coerce.number().min(0), delta: z.coerce.number() })),
+    sizes: z.array(z.string()),
+    sizeLabel: z.string(),
+  }),
+  certificateLab: z.string().optional().nullable(),
+  certificateNo: z.string().optional().nullable(),
+  certificateUrl: z.string().optional().nullable(),
+  huid: z.string().optional().nullable(),
+  hsnCode: z.string().optional().nullable(),
+  tryAtHome: z.boolean(),
 });
 
 export type ProductInput = z.infer<typeof productInput>;
@@ -184,6 +201,8 @@ export async function saveProduct(id: string | null, input: ProductInput): Promi
       images: JSON.stringify(d.images),
       details: JSON.stringify(d.details.filter((x) => x.label || x.value)),
       collectionId: d.collectionId || null,
+      pricing: JSON.stringify({ ...d.pricing, sizes: d.pricing.sizes.map((s) => s.trim()).filter(Boolean) }),
+      huid: d.huid ? d.huid.trim().toUpperCase() : null,
     };
     const row = id ? await db.product.update({ where: { id }, data }) : await db.product.create({ data });
     refresh();

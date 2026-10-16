@@ -1,49 +1,73 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { SplitText } from "@/components/site/motion";
+import type { Metadata } from "next";
+import { OrderView } from "@/components/site/OrderView";
+import { getCustomerSession } from "@/lib/customer";
 import { db } from "@/lib/db";
+import { canViewOrder, STATUS_LABEL, timelineOf } from "@/lib/orders";
 import { getSetting } from "@/lib/settings";
-import { formatPrice, parseJSON } from "@/lib/utils";
+import { parseJSON } from "@/lib/utils";
 
-type Props = { params: Promise<{ number: string }>; searchParams: Promise<{ payment?: string }> };
+export const metadata: Metadata = { title: "Your order", robots: { index: false } };
+
+type Props = { params: Promise<{ number: string }>; searchParams: Promise<{ payment?: string; k?: string }> };
 
 export default async function OrderPage({ params, searchParams }: Props) {
   const { number } = await params;
-  const { payment } = await searchParams;
-  const order = await db.order.findUnique({ where: { number } });
+  const { payment, k } = await searchParams;
+  const order = await db.order.findUnique({ where: { number }, include: { returns: { orderBy: { createdAt: "desc" } } } });
   if (!order) notFound();
-  const site = await getSetting("site");
-  const items = parseJSON<{ name: string; qty: number; price: number }[]>(order.items, []);
-  const fmt = (n: number) => formatPrice(n, site.currency, site.locale);
-  return (
-    <div className="site-container max-w-3xl pb-28 pt-36 text-center md:pt-48">
-      <p className="eyebrow">Order {order.number}</p>
-      <SplitText as="h1" immediate text={payment === "failed" ? "Payment *pending*" : "Thank *you*"} className="display mt-6 block text-[clamp(3.6rem,10vw,9rem)] leading-[0.9]" />
-      <p className="mx-auto mt-8 max-w-md text-muted">
-        {payment === "failed"
-          ? "We couldn't confirm your payment. Your order is saved — our concierge will contact you to complete it."
-          : `A confirmation has been sent to ${order.email}. Our concierge will call you shortly to arrange insured delivery.`}
-      </p>
-      <div className="mt-14 rounded-[var(--radius)] bg-surface p-8 text-left">
-        {items.map((i, k) => (
-          <div key={k} className="flex justify-between border-b border-line py-3 text-sm">
-            <span>
-              {i.name} × {i.qty}
-            </span>
-            <span className="tabular-nums">{fmt(i.price * i.qty)}</span>
-          </div>
-        ))}
-        <div className="flex justify-between pt-4 text-lg">
-          <span>Total</span>
-          <span className="tabular-nums">{fmt(order.total)}</span>
+  if (!(await canViewOrder(order, k))) {
+    return (
+      <div className="site-container flex min-h-[70vh] flex-col items-center justify-center pt-24 text-center">
+        <p className="display text-5xl">Sign in to view this order</p>
+        <p className="mt-4 max-w-md text-muted">For your privacy, order details are only visible to the account that placed them.</p>
+        <div className="mt-8 flex gap-4">
+          <Link href={`/account?next=/order/${number}`} className="btn btn-primary">
+            Sign in
+          </Link>
+          <Link href={`/track?order=${number}`} className="btn btn-ghost">
+            Track with email
+          </Link>
         </div>
-        <p className="mt-4 text-xs uppercase tracking-[0.16em] text-muted">
-          {order.paymentMethod === "cod" ? "Pay on delivery" : "Paid online"} · {order.paymentStatus}
-        </p>
       </div>
-      <Link href="/shop" className="btn btn-primary mt-12">
-        Continue browsing
-      </Link>
-    </div>
+    );
+  }
+  const [commerce, session] = await Promise.all([getSetting("commerce"), getCustomerSession()]);
+  const isOwner = !!session && session.sub === order.customerId;
+  const deliveredAt = [...timelineOf(order)].reverse().find((t) => t.status === "delivered")?.at;
+  const returnOpen = !!deliveredAt && Date.now() - new Date(deliveredAt).getTime() <= commerce.returnWindowDays * 864e5;
+  return (
+    <OrderView
+      payment={payment}
+      accessKey={order.accessKey ?? ""}
+      canRequestReturn={isOwner && order.status === "delivered" && returnOpen && !order.returns.some((r) => !["rejected", "closed", "refunded", "exchanged"].includes(r.status))}
+      exchangeEnabled={commerce.exchangeEnabled}
+      returnWindowDays={commerce.returnWindowDays}
+      order={{
+        number: order.number,
+        createdAt: order.createdAt.toISOString(),
+        status: order.status,
+        statusLabel: STATUS_LABEL[order.status] ?? order.status,
+        email: order.email,
+        paymentMethod: order.paymentMethod,
+        paymentStatus: order.paymentStatus,
+        subtotal: order.subtotal,
+        discount: order.discount,
+        couponCode: order.couponCode,
+        giftWrapFee: order.giftWrapFee,
+        giftMessage: order.giftMessage,
+        shipping: order.shipping,
+        total: order.total,
+        taxAmount: order.taxAmount,
+        courier: order.courier,
+        awb: order.awb,
+        trackingUrl: order.trackingUrl,
+        timeline: timelineOf(order),
+        address: parseJSON<Record<string, string>>(order.address, {}),
+        items: parseJSON<{ name: string; qty: number; price: number; variant?: string; image?: string; slug?: string; huid?: string }[]>(order.items, []),
+        returns: order.returns.map((r) => ({ id: r.id, type: r.type, status: r.status, reason: r.reason, adminNote: r.adminNote, createdAt: r.createdAt.toISOString() })),
+      }}
+    />
   );
 }

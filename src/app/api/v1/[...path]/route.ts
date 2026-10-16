@@ -3,6 +3,7 @@ import { z } from "zod";
 import { checkApiKey } from "@/lib/apikey";
 import { db } from "@/lib/db";
 import { getSetting } from "@/lib/settings";
+import { getPricingContext } from "@/lib/catalog";
 import { toProductView } from "@/lib/types";
 import { parseJSON, slugify } from "@/lib/utils";
 
@@ -23,11 +24,14 @@ export async function GET(req: Request, { params }: Ctx) {
   const limit = Math.min(100, Number(url.searchParams.get("limit")) || 50);
   const offset = Number(url.searchParams.get("offset")) || 0;
 
+  const ctx = await getPricingContext();
+  const view = (p: Parameters<typeof toProductView>[0]) => toProductView(p, ctx);
+
   switch (resource) {
     case "products": {
       if (id) {
         const p = await db.product.findFirst({ where: { OR: [{ id }, { slug: id }] }, include: { collection: true } });
-        return p ? json({ data: toProductView(p) }) : json({ error: "Not found" }, 404);
+        return p ? json({ data: view(p) }) : json({ error: "Not found" }, 404);
       }
       const collection = url.searchParams.get("collection");
       const rows = await db.product.findMany({
@@ -37,12 +41,12 @@ export async function GET(req: Request, { params }: Ctx) {
         take: limit,
         skip: offset,
       });
-      return json({ data: rows.map(toProductView), limit, offset });
+      return json({ data: rows.map(view), limit, offset });
     }
     case "collections": {
       if (id) {
         const c = await db.collection.findFirst({ where: { OR: [{ id }, { slug: id }] }, include: { products: { where: { published: true } } } });
-        return c ? json({ data: { ...c, products: c.products.map(toProductView) } }) : json({ error: "Not found" }, 404);
+        return c ? json({ data: { ...c, products: c.products.map(view) } }) : json({ error: "Not found" }, 404);
       }
       return json({ data: await db.collection.findMany({ orderBy: { sortOrder: "asc" } }) });
     }

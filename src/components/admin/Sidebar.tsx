@@ -4,6 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
+  BadgePercent,
+  CalendarClock,
+  MapPinned,
+  MessageSquareQuote,
+  RotateCcw,
+  Store,
+  UserRound,
   BookOpen,
   Boxes,
   ExternalLink,
@@ -41,13 +48,24 @@ const groups = [
     items: [
       { href: "/admin/products", label: "Products", icon: Gem },
       { href: "/admin/collections", label: "Collections", icon: Boxes },
+      { href: "/admin/reviews", label: "Reviews", icon: MessageSquareQuote, count: "reviews" as const },
     ],
   },
   {
     label: "Sales",
     items: [
       { href: "/admin/orders", label: "Orders", icon: ShoppingBag, count: "orders" as const },
+      { href: "/admin/returns", label: "Returns", icon: RotateCcw, count: "returns" as const },
+      { href: "/admin/customers", label: "Customers", icon: UserRound },
+      { href: "/admin/coupons", label: "Coupons", icon: BadgePercent },
+    ],
+  },
+  {
+    label: "Clienteling",
+    items: [
+      { href: "/admin/appointments", label: "Appointments", icon: CalendarClock, count: "appointments" as const },
       { href: "/admin/inquiries", label: "Inquiries", icon: Inbox, count: "inquiries" as const },
+      { href: "/admin/stores", label: "Boutiques", icon: MapPinned },
     ],
   },
   {
@@ -55,6 +73,7 @@ const groups = [
     items: [
       { href: "/admin/theme", label: "Theme", icon: Palette },
       { href: "/admin/settings", label: "Site settings", icon: Settings },
+      { href: "/admin/commerce", label: "Store settings", icon: Store },
       { href: "/admin/integrations", label: "Integrations", icon: Plug, adminOnly: true },
       { href: "/admin/api-keys", label: "API keys", icon: KeyRound, adminOnly: true },
       { href: "/admin/users", label: "Users", icon: Users, adminOnly: true },
@@ -62,7 +81,7 @@ const groups = [
   },
 ];
 
-export function Sidebar({ brand, user, counts }: { brand: string; user: { name: string; email: string; role: string }; counts: { orders: number; inquiries: number } }) {
+export function Sidebar({ brand, user, counts }: { brand: string; user: { name: string; email: string; role: string }; counts: { orders: number; inquiries: number; reviews: number; returns: number; appointments: number } }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   useEffect(() => setOpen(false), [pathname]);

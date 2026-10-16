@@ -43,6 +43,7 @@ async function main() {
 
   if ((await db.product.count()) > 0) {
     console.log("Content already present — skipped catalogue seed.");
+    await upgrade();
     return;
   }
 
@@ -202,7 +203,143 @@ async function main() {
     ],
   });
 
+  await upgrade();
   console.log(`Seeded. Admin login → ${email} / ${password}`);
+}
+
+/** Idempotent additions for commerce features — safe to run on an existing database. */
+async function upgrade() {
+  const ringSizes = ["8", "10", "12", "14", "16", "18", "20"];
+  const variants: Record<string, object> = {
+    "ember-solitaire-ring": {
+      mode: "rate",
+      metalWeight: 4.2,
+      stoneValue: 142000,
+      makingType: "percent",
+      makingValue: 16,
+      metals: [
+        { label: "18K Yellow Gold", rateKey: "gold18", delta: 0 },
+        { label: "18K Rose Gold", rateKey: "gold18", delta: 0 },
+        { label: "18K White Gold", rateKey: "gold18", delta: 0 },
+        { label: "Platinum", rateKey: "platinum", delta: 0 },
+      ],
+      qualities: [
+        { label: "SI-IJ", stoneValue: 118000, delta: 0 },
+        { label: "VS-GH", stoneValue: 142000, delta: 0 },
+        { label: "VVS-EF", stoneValue: 196000, delta: 0 },
+      ],
+      sizes: ringSizes,
+      sizeLabel: "Ring size",
+    },
+    "halo-eternity-band": {
+      mode: "fixed",
+      metalWeight: 0,
+      stoneValue: 0,
+      makingType: "percent",
+      makingValue: 0,
+      metals: [
+        { label: "Platinum", rateKey: "platinum", delta: 0 },
+        { label: "18K White Gold", rateKey: "gold18", delta: -9000 },
+      ],
+      qualities: [],
+      sizes: ringSizes,
+      sizeLabel: "Ring size",
+    },
+    "twin-stack-rings": {
+      mode: "fixed",
+      metalWeight: 0,
+      stoneValue: 0,
+      makingType: "percent",
+      makingValue: 0,
+      metals: [
+        { label: "18K Yellow Gold", rateKey: "gold18", delta: 0 },
+        { label: "18K Rose Gold", rateKey: "gold18", delta: 0 },
+      ],
+      qualities: [],
+      sizes: ringSizes,
+      sizeLabel: "Ring size",
+    },
+    "banyan-cuff": {
+      mode: "rate",
+      metalWeight: 31,
+      stoneValue: 0,
+      makingType: "perGram",
+      makingValue: 950,
+      metals: [{ label: "22K Yellow Gold", rateKey: "gold22", delta: 0 }],
+      qualities: [],
+      sizes: ["2.4", "2.6", "2.8"],
+      sizeLabel: "Bangle size",
+    },
+    "ojas-signet": {
+      mode: "rate",
+      metalWeight: 11.2,
+      stoneValue: 0,
+      makingType: "percent",
+      makingValue: 12,
+      metals: [{ label: "22K Yellow Gold", rateKey: "gold22", delta: 0 }],
+      qualities: [],
+      sizes: ["16", "18", "20", "22", "24"],
+      sizeLabel: "Ring size",
+    },
+  };
+  for (const [slug, pricing] of Object.entries(variants)) {
+    await db.product.updateMany({ where: { slug, pricing: "{}" }, data: { pricing: JSON.stringify(pricing) } });
+  }
+  await db.product.updateMany({ where: { slug: "ember-solitaire-ring", certificateNo: null }, data: { certificateLab: "IGI", certificateNo: "LG598314267", huid: "AB12C9" } });
+  await db.product.updateMany({ where: { slug: "halo-eternity-band", certificateNo: null }, data: { certificateLab: "GIA", certificateNo: "2215963784" } });
+  await db.product.updateMany({ where: { slug: "solstice-collar", huid: null }, data: { huid: "K7P2QX" } });
+
+  if ((await db.store.count()) === 0) {
+    await db.store.createMany({
+      data: [
+        { name: "The Haveli", city: "Jaipur", address: "14, Johari Bazaar, Jaipur, Rajasthan 302003", phone: "+91 98290 00000", hours: "Mon – Sat · 11:00 – 20:00", lat: 26.9196, lng: 75.8235, services: "store,tryathome,video", sortOrder: 1 },
+        { name: "Mehrauli Salon", city: "New Delhi", address: "Kalka Das Marg, Mehrauli, New Delhi 110030", phone: "+91 98100 00000", hours: "Tue – Sun · 11:00 – 20:00", lat: 28.5245, lng: 77.1855, services: "store,tryathome,video", sortOrder: 2 },
+        { name: "Kala Ghoda Atelier", city: "Mumbai", address: "Rampart Row, Kala Ghoda, Fort, Mumbai 400001", phone: "+91 98200 00000", hours: "Mon – Sat · 11:30 – 20:30", lat: 18.9281, lng: 72.8318, services: "store,video", sortOrder: 3 },
+      ],
+    });
+  }
+
+  if ((await db.coupon.count()) === 0) {
+    await db.coupon.createMany({
+      data: [
+        { code: "WELCOME10", description: "10% off your first piece (up to ₹15,000)", type: "percent", value: 10, maxDiscount: 15000, minOrder: 20000 },
+        { code: "FESTIVE5000", description: "₹5,000 off orders above ₹1,00,000", type: "flat", value: 5000, minOrder: 100000 },
+      ],
+    });
+  }
+
+  if ((await db.review.count()) === 0) {
+    const bySlug = async (slug: string) => (await db.product.findUnique({ where: { slug } }))?.id;
+    const reviews: [string, string, number, string, string, boolean][] = [
+      ["ember-solitaire-ring", "Priya S.", 5, "Better than the photos", "The stone throws light across the room. Sizing was perfect using the on-screen sizer.", true],
+      ["ember-solitaire-ring", "Arjun M.", 5, "She said yes", "The video consultation helped me pick VS-GH over VVS — honestly can't tell the difference and saved a lot.", true],
+      ["ember-solitaire-ring", "Neha K.", 4, "Beautiful, delivery took a week", "Gorgeous ring, packaging is lovely. Took a couple of days longer than estimated.", false],
+      ["dewdrop-earrings", "Ritika", 5, "Everyday favourites", "Light, comfortable and the rose gold is so soft. Wearing them daily.", true],
+      ["solstice-collar", "Mrs. Bhandari", 5, "An heirloom", "Wore it for my daughter's sangeet. The craftsmanship is extraordinary.", true],
+      ["banyan-cuff", "Kavya", 4, "Heavy and luxurious", "Substantial piece. The price breakup on the site made the making charges very clear.", true],
+    ];
+    for (const [slug, name, rating, title, body, verified] of reviews) {
+      const productId = await bySlug(slug);
+      if (productId) await db.review.create({ data: { productId, name, rating, title, body, verified, status: "approved" } });
+    }
+  }
+
+  // Add new footer links to an existing navigation without overwriting edits.
+  const navRow = await db.setting.findUnique({ where: { key: "navigation" } });
+  if (navRow) {
+    const nav = JSON.parse(navRow.value) as { header: { label: string; href: string }[]; footer: { title: string; links: { label: string; href: string }[] }[] };
+    const flat = JSON.stringify(nav);
+    const care = nav.footer.find((c) => c.title === "Care") ?? nav.footer[nav.footer.length - 1];
+    const maison = nav.footer.find((c) => c.title === "Maison") ?? nav.footer[0];
+    if (care && !flat.includes('"/track"')) care.links.unshift({ label: "Track your order", href: "/track" }, { label: "Your account", href: "/account" });
+    if (maison && !flat.includes('"/stores"')) maison.links.push({ label: "Boutiques", href: "/stores" });
+    if (!flat.includes('"/book"')) {
+      const existing = nav.footer.flatMap((c) => c.links).find((l) => l.label === "Book an appointment");
+      if (existing) existing.href = "/book";
+      else maison?.links.push({ label: "Book an appointment", href: "/book" });
+    }
+    await db.setting.update({ where: { key: "navigation" }, data: { value: JSON.stringify(nav) } });
+  }
 }
 
 main()

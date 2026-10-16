@@ -50,7 +50,7 @@ export function MediaPicker({ open, onClose, onPick }: { open: boolean; onClose:
         <input
           ref={file}
           type="file"
-          accept="image/*,video/mp4,video/webm"
+          accept="image/*,video/mp4,video/webm,application/pdf"
           multiple
           className="hidden"
           onChange={async (e) => {
@@ -83,7 +83,9 @@ export function MediaPicker({ open, onClose, onPick }: { open: boolean; onClose:
             }}
             className="group relative aspect-square overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50"
           >
-            {m.type.startsWith("video") ? (
+            {m.type === "application/pdf" ? (
+              <span className="grid h-full w-full place-items-center text-xs font-semibold text-rose-600">PDF</span>
+            ) : m.type.startsWith("video") ? (
               <video src={m.url} className="h-full w-full object-cover" muted />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element

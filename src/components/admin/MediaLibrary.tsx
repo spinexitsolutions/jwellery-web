@@ -46,8 +46,8 @@ export function MediaLibrary({ initial }: { initial: M[] }) {
       <div className={cn("mb-6 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-10 text-center transition", drag ? "border-zinc-900 bg-zinc-100" : "border-zinc-200 bg-white")}>
         <Upload className="text-zinc-400" />
         <p className="mt-3 font-medium">Drop files here to upload</p>
-        <p className="text-sm text-zinc-500">JPG, PNG, WEBP, AVIF, SVG, MP4 · up to 15MB each</p>
-        <input ref={input} type="file" multiple accept="image/*,video/mp4,video/webm" className="hidden" onChange={(e) => e.target.files && upload(e.target.files)} />
+        <p className="text-sm text-zinc-500">JPG, PNG, WEBP, AVIF, SVG, MP4, PDF · up to 15MB each</p>
+        <input ref={input} type="file" multiple accept="image/*,video/mp4,video/webm,application/pdf" className="hidden" onChange={(e) => e.target.files && upload(e.target.files)} />
         <Button className="mt-4" loading={busy} onClick={() => input.current?.click()}>
           Choose files
         </Button>
@@ -60,7 +60,9 @@ export function MediaLibrary({ initial }: { initial: M[] }) {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
             {items.map((m) => (
               <button key={m.id} onClick={() => setSel(m)} className={cn("group aspect-square overflow-hidden rounded-xl border-2 bg-zinc-100", sel?.id === m.id ? "border-zinc-900" : "border-transparent")}>
-                {m.type.startsWith("video") ? (
+                {m.type === "application/pdf" ? (
+                  <span className="grid h-full w-full place-items-center text-xs font-semibold text-rose-600">PDF</span>
+                ) : m.type.startsWith("video") ? (
                   <video src={m.url} className="h-full w-full object-cover" muted />
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -72,7 +74,7 @@ export function MediaLibrary({ initial }: { initial: M[] }) {
           {sel && (
             <div className="h-fit space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 lg:sticky lg:top-6">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              {!sel.type.startsWith("video") && <img src={sel.url} alt="" className="w-full rounded-lg" />}
+              {sel.type.startsWith("image") && <img src={sel.url} alt="" className="w-full rounded-lg" />}
               <div className="text-sm">
                 <p className="truncate font-medium">{sel.name}</p>
                 <p className="text-xs text-zinc-500">

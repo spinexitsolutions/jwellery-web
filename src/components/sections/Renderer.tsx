@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { db } from "@/lib/db";
 import { renderMarkdown } from "@/lib/markdown";
 import type { Section } from "@/lib/sections";
-import { toProductView } from "@/lib/types";
+import { viewProducts } from "@/lib/catalog";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { Collections } from "./Collections";
@@ -61,7 +61,7 @@ async function renderOne(section: Section) {
         orderBy: data.source === "latest" ? { createdAt: "desc" } : { sortOrder: "asc" },
         include: { collection: true },
       });
-      return <ProductsGrid data={data} products={rows.map(toProductView)} />;
+      return <ProductsGrid data={data} products={await viewProducts(rows)} />;
     }
     case "story":
       return <Story data={{ ...data, bodyHtml: renderMarkdown(data.body) }} />;

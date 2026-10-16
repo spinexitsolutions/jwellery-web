@@ -12,6 +12,7 @@ const TYPES: Record<string, string> = {
   ".mp4": "video/mp4",
   ".webm": "video/webm",
   ".glb": "model/gltf-binary",
+  ".pdf": "application/pdf",
 };
 
 export async function GET(_req: Request, { params }: { params: Promise<{ path: string[] }> }) {

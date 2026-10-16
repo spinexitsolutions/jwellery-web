@@ -2,17 +2,22 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import type { ProductView } from "@/lib/types";
 import { useCart } from "./Cart";
 import { Reveal, SafeImage } from "./motion";
 import { usePrice } from "./SiteProvider";
+import { Stars, WishButton } from "./Wish";
 
 export function ProductCard({ product, index = 0, size = "md" }: { product: ProductView; index?: number; size?: "md" | "lg" }) {
   const price = usePrice();
   const { add } = useCart();
   const [a, b] = product.images;
   const soldOut = product.stock <= 0;
+  const router = useRouter();
+  const cfg = product.pricing;
+  const needsChoice = cfg.sizes.length > 0 || cfg.metals.length > 1 || cfg.qualities.length > 1;
   return (
     <Reveal delay={(index % 4) * 0.08} className="group">
       <Link href={`/shop/${product.slug}`} className="block" data-cursor="View">
@@ -31,12 +36,14 @@ export function ProductCard({ product, index = 0, size = "md" }: { product: Prod
             )}
             {soldOut && <span className="rounded-full bg-fg px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-bg">Made to order</span>}
           </div>
+          <WishButton productId={product.id} className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-bg/85 text-fg backdrop-blur transition hover:bg-bg" />
           <motion.button
             type="button"
             aria-label={`Add ${product.name} to bag`}
             onClick={(e) => {
               e.preventDefault();
-              add({ id: product.id, slug: product.slug, name: product.name, price: product.price, image: a || "" });
+              if (needsChoice) router.push(`/shop/${product.slug}`);
+              else add({ id: product.id, slug: product.slug, name: product.name, price: product.price, image: a || "" });
             }}
             className="absolute bottom-3 right-3 grid h-11 w-11 translate-y-3 place-items-center rounded-full bg-bg text-fg opacity-0 shadow-sm transition-all duration-500 hover:bg-fg hover:text-bg group-hover:translate-y-0 group-hover:opacity-100 max-md:translate-y-0 max-md:opacity-100"
           >
@@ -47,9 +54,17 @@ export function ProductCard({ product, index = 0, size = "md" }: { product: Prod
           <div>
             <h3 className="display text-[1.45rem] leading-tight">{product.name}</h3>
             <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted">{product.metal}</p>
+            {product.rating && (
+              <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted">
+                <Stars value={product.rating.avg} size={11} /> {product.rating.count}
+              </p>
+            )}
           </div>
           <div className="shrink-0 text-right text-sm tabular-nums">
-            <p>{price(product.price)}</p>
+            <p>
+              {needsChoice && <span className="text-muted">from </span>}
+              {price(product.price)}
+            </p>
             {product.compareAtPrice && product.compareAtPrice > product.price && <p className="text-xs text-muted line-through">{price(product.compareAtPrice)}</p>}
           </div>
         </div>

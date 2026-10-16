@@ -4,7 +4,7 @@ import { ShopFilters } from "@/components/site/ShopFilters";
 import { ProductCard } from "@/components/site/ProductCard";
 import { SplitText } from "@/components/site/motion";
 import { db } from "@/lib/db";
-import { toProductView } from "@/lib/types";
+import { viewProducts } from "@/lib/catalog";
 
 export const metadata: Metadata = { title: "Shop" };
 
@@ -21,10 +21,14 @@ export default async function Shop({ searchParams }: Props) {
   const orderBy: Prisma.ProductOrderByWithRelationInput =
     sp.sort === "price-asc" ? { price: "asc" } : sp.sort === "price-desc" ? { price: "desc" } : sp.sort === "new" ? { createdAt: "desc" } : sp.sort === "featured" ? { featured: "desc" } : { sortOrder: "asc" };
 
-  const [products, collections] = await Promise.all([
+  const [rows, collections] = await Promise.all([
     db.product.findMany({ where, orderBy, include: { collection: true } }),
     db.collection.findMany({ orderBy: { sortOrder: "asc" }, select: { name: true, slug: true } }),
   ]);
+  // Live-rate products are priced at request time, so price sorting happens after pricing.
+  const products = await viewProducts(rows);
+  if (sp.sort === "price-asc") products.sort((a, b) => a.price - b.price);
+  if (sp.sort === "price-desc") products.sort((a, b) => b.price - a.price);
 
   return (
     <div className="site-container pb-32 pt-36 md:pt-44">
@@ -38,7 +42,7 @@ export default async function Shop({ searchParams }: Props) {
       <ShopFilters collections={collections} />
       <div className="grid grid-cols-2 gap-x-4 gap-y-14 md:gap-x-6 lg:grid-cols-3 xl:grid-cols-4">
         {products.map((p, i) => (
-          <ProductCard key={p.id} product={toProductView(p)} index={i} />
+          <ProductCard key={p.id} product={p} index={i} />
         ))}
       </div>
       {products.length === 0 && (

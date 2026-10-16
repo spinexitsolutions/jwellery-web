@@ -49,3 +49,44 @@ export async function notifyAll(event: string, subject: string, payload: Record<
     .join("");
   await Promise.allSettled([fireWebhooks(event, payload), sendMail({ subject, html: `<h2>${subject}</h2><table>${rows}</table>` })]);
 }
+
+/** Send an SMS via the provider configured in Integrations. No-op (returns false) when not configured. */
+export async function sendSms(to: string, body: string) {
+  try {
+    const i = await getSetting("integrations");
+    const digits = to.replace(/[^0-9]/g, "");
+    if (!digits) return false;
+    if (i.smsProvider === "twilio" && i.twilioSid && i.twilioToken && i.twilioFrom) {
+      const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${i.twilioSid}/Messages.json`, {
+        method: "POST",
+        headers: { Authorization: `Basic ${Buffer.from(`${i.twilioSid}:${i.twilioToken}`).toString("base64")}`, "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ To: `+${digits}`, From: i.twilioFrom, Body: body }),
+        signal: AbortSignal.timeout(8000),
+      });
+      return res.ok;
+    }
+    if (i.smsProvider === "fast2sms" && i.fast2smsKey) {
+      const res = await fetch("https://www.fast2sms.com/dev/bulkV2", {
+        method: "POST",
+        headers: { authorization: i.fast2smsKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ route: "q", message: body, numbers: digits.slice(-10) }),
+        signal: AbortSignal.timeout(8000),
+      });
+      return res.ok;
+    }
+    return false;
+  } catch (e) {
+    console.error("sms error", e);
+    return false;
+  }
+}
+
+export async function smsConfigured() {
+  const i = await getSetting("integrations");
+  return (i.smsProvider === "twilio" && !!i.twilioSid && !!i.twilioToken && !!i.twilioFrom) || (i.smsProvider === "fast2sms" && !!i.fast2smsKey);
+}
+
+export async function emailConfigured() {
+  const i = await getSetting("integrations");
+  return !!i.smtpHost;
+}

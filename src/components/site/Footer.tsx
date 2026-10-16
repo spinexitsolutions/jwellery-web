@@ -51,8 +51,8 @@ export function Footer({ nav, socials, note }: { nav: Navigation["footer"]; soci
             <div key={col.title}>
               <p className="eyebrow !text-dark-fg/50">{col.title}</p>
               <ul className="mt-5 space-y-3 text-sm">
-                {col.links.map((l) => (
-                  <li key={l.label}>
+                {col.links.map((l, i) => (
+                  <li key={`${l.href}-${i}`}>
                     <Link href={l.href} className="link-underline">
                       {l.label}
                     </Link>

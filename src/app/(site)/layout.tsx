@@ -1,3 +1,4 @@
+import { AccountProvider } from "@/components/site/Account";
 import { CartProvider } from "@/components/site/Cart";
 import { Cursor } from "@/components/site/Cursor";
 import { Analytics, CustomCode, WhatsAppButton } from "@/components/site/Extras";
@@ -44,6 +45,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
   return (
     <SiteProvider value={config}>
       <SmoothScroll enabled={theme.animations && theme.smoothScroll}>
+        <AccountProvider>
         <CartProvider>
           <div className={cn("min-h-screen", theme.grain && "grain", !theme.animations && "no-anim")}>
             {theme.preloader && theme.animations && <Preloader brand={site.brandName} />}
@@ -54,6 +56,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
             {theme.customCursor && theme.animations && <Cursor />}
           </div>
         </CartProvider>
+        </AccountProvider>
       </SmoothScroll>
       <Analytics ga={integrations.googleAnalyticsId} gtm={integrations.gtmId} pixel={integrations.metaPixelId} />
       <CustomCode head={integrations.customHead} body={integrations.customBody} />

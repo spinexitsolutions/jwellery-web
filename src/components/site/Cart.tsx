@@ -15,9 +15,9 @@ type CartCtx = {
   subtotal: number;
   open: boolean;
   setOpen: (v: boolean) => void;
-  add: (item: Omit<CartItem, "qty">, qty?: number) => void;
-  update: (id: string, qty: number) => void;
-  remove: (id: string) => void;
+  add: (item: Omit<CartItem, "qty" | "key"> & { key?: string }, qty?: number) => void;
+  update: (key: string, qty: number) => void;
+  remove: (key: string) => void;
   clear: () => void;
 };
 
@@ -32,7 +32,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(KEY);
-      if (raw) setItems(JSON.parse(raw));
+      if (raw) setItems((JSON.parse(raw) as CartItem[]).map((i) => ({ ...i, key: i.key ?? i.id })));
     } catch {}
     setReady(true);
   }, []);
@@ -44,16 +44,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, [items, ready]);
 
-  const add = useCallback((item: Omit<CartItem, "qty">, qty = 1) => {
+  const add = useCallback((item: Omit<CartItem, "qty" | "key"> & { key?: string }, qty = 1) => {
+    const key = item.key ?? item.id;
     setItems((prev) => {
-      const found = prev.find((p) => p.id === item.id);
-      if (found) return prev.map((p) => (p.id === item.id ? { ...p, qty: p.qty + qty } : p));
-      return [...prev, { ...item, qty }];
+      const found = prev.find((p) => p.key === key);
+      if (found) return prev.map((p) => (p.key === key ? { ...p, qty: p.qty + qty, price: item.price } : p));
+      return [...prev, { ...item, key, qty }];
     });
     setOpen(true);
   }, []);
-  const update = useCallback((id: string, qty: number) => setItems((prev) => prev.map((p) => (p.id === id ? { ...p, qty: Math.max(1, qty) } : p))), []);
-  const remove = useCallback((id: string) => setItems((prev) => prev.filter((p) => p.id !== id)), []);
+  const update = useCallback((key: string, qty: number) => setItems((prev) => prev.map((p) => (p.key === key ? { ...p, qty: Math.max(1, qty) } : p))), []);
+  const remove = useCallback((key: string) => setItems((prev) => prev.filter((p) => p.key !== key)), []);
   const clear = useCallback(() => setItems([]), []);
 
   const value = useMemo(
@@ -132,25 +133,26 @@ function CartDrawer() {
               ) : (
                 <ul className="divide-y divide-line">
                   {items.map((it, i) => (
-                    <motion.li key={it.id} className="flex gap-4 py-5" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 + i * 0.05 }}>
+                    <motion.li key={it.key} className="flex gap-4 py-5" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 + i * 0.05 }}>
                       <SafeImage src={it.image} alt={it.name} className="h-28 w-24 shrink-0 object-cover" />
                       <div className="flex flex-1 flex-col">
                         <div className="flex justify-between gap-2">
                           <Link href={`/shop/${it.slug}`} onClick={() => setOpen(false)} className="display text-xl leading-tight">
                             {it.name}
                           </Link>
-                          <button onClick={() => remove(it.id)} className="text-muted hover:text-fg" aria-label="Remove">
+                          <button onClick={() => remove(it.key)} className="text-muted hover:text-fg" aria-label="Remove">
                             <X size={14} />
                           </button>
                         </div>
+                        {it.variant && <p className="mt-1 text-xs text-muted">{it.variant}</p>}
                         <p className="mt-1 text-sm text-muted">{price(it.price)}</p>
                         <div className="mt-auto flex items-center gap-3">
                           <div className="flex items-center rounded-full border border-line">
-                            <button className="grid h-8 w-8 place-items-center" onClick={() => update(it.id, it.qty - 1)} aria-label="Decrease">
+                            <button className="grid h-8 w-8 place-items-center" onClick={() => update(it.key, it.qty - 1)} aria-label="Decrease">
                               <Minus size={12} />
                             </button>
                             <span className="w-6 text-center text-sm tabular-nums">{it.qty}</span>
-                            <button className="grid h-8 w-8 place-items-center" onClick={() => update(it.id, it.qty + 1)} aria-label="Increase">
+                            <button className="grid h-8 w-8 place-items-center" onClick={() => update(it.key, it.qty + 1)} aria-label="Increase">
                               <Plus size={12} />
                             </button>
                           </div>

@@ -58,6 +58,40 @@ export type Navigation = {
 
 export type Webhook = { event: string; url: string; enabled: boolean };
 
+export type MetalRate = { key: string; label: string; perGram: number; showInTicker: boolean };
+
+export type CommerceSettings = {
+  gstPercent: number;
+  gstin: string;
+  legalName: string;
+  businessState: string;
+  invoicePrefix: string;
+  hsnCode: string;
+  giftWrapEnabled: boolean;
+  giftWrapFee: number;
+  emiEnabled: boolean;
+  emiMinAmount: number;
+  emiMonths: number[];
+  emiInterestPercent: number;
+  returnWindowDays: number;
+  exchangeEnabled: boolean;
+  returnPolicy: string;
+  deliveryMode: "rules" | "shiprocket";
+  deliveryAllPincodes: boolean;
+  deliveryPincodePrefixes: string;
+  deliveryExpressPrefixes: string;
+  deliveryStandardDays: number;
+  deliveryExpressDays: number;
+  deliveryCodMax: number;
+  appointmentSlots: string[];
+  appointmentDaysAhead: number;
+  tryAtHomeEnabled: boolean;
+  tryAtHomePincodes: string;
+  videoConsultEnabled: boolean;
+  reviewsAutoApprove: boolean;
+  ringSizes: string[];
+};
+
 export type Integrations = {
   googleAnalyticsId: string;
   gtmId: string;
@@ -75,11 +109,23 @@ export type Integrations = {
   notifyEmail: string;
   ratesEnabled: boolean;
   ratesSource: "manual" | "api";
-  manualRates: { label: string; value: string }[];
+  /** Price per gram for each metal/purity. Used by live-rate product pricing and the ticker. */
+  metalRates: MetalRate[];
   ratesApiUrl: string;
   ratesApiHeaderName: string;
   ratesApiHeaderValue: string;
-  ratesApiMap: { label: string; path: string; suffix: string }[];
+  /** Maps a metal rate key to a dot-path in the API JSON, with an optional multiplier (e.g. 0.1 for per-10g APIs). */
+  ratesApiMap: { key: string; path: string; multiplier: number }[];
+  smsProvider: "none" | "twilio" | "fast2sms";
+  twilioSid: string;
+  twilioToken: string;
+  twilioFrom: string;
+  fast2smsKey: string;
+  shiprocketEnabled: boolean;
+  shiprocketEmail: string;
+  shiprocketPassword: string;
+  shiprocketPickupLocation: string;
+  shiprocketPickupPincode: string;
   webhooks: Webhook[];
   customHead: string;
   customBody: string;
@@ -241,12 +287,15 @@ export const DEFAULT_NAV: Navigation = {
       links: [
         { label: "The Atelier", href: "/atelier" },
         { label: "Journal", href: "/journal" },
-        { label: "Book an appointment", href: "/contact" },
+        { label: "Boutiques", href: "/stores" },
+        { label: "Book an appointment", href: "/book" },
       ],
     },
     {
       title: "Care",
       links: [
+        { label: "Track your order", href: "/track" },
+        { label: "Your account", href: "/account" },
         { label: "Shipping & returns", href: "/care" },
         { label: "Jewellery care", href: "/care" },
         { label: "FAQ", href: "/care" },
@@ -272,22 +321,67 @@ export const DEFAULT_INTEGRATIONS: Integrations = {
   notifyEmail: "",
   ratesEnabled: true,
   ratesSource: "manual",
-  manualRates: [
-    { label: "Gold 24K", value: "₹7,840/g" },
-    { label: "Gold 22K", value: "₹7,190/g" },
-    { label: "Gold 18K", value: "₹5,880/g" },
-    { label: "Silver", value: "₹96/g" },
+  metalRates: [
+    { key: "gold24", label: "Gold 24K", perGram: 7840, showInTicker: true },
+    { key: "gold22", label: "Gold 22K", perGram: 7190, showInTicker: true },
+    { key: "gold18", label: "Gold 18K", perGram: 5880, showInTicker: true },
+    { key: "gold14", label: "Gold 14K", perGram: 4590, showInTicker: false },
+    { key: "platinum", label: "Platinum", perGram: 3150, showInTicker: false },
+    { key: "silver", label: "Silver", perGram: 96, showInTicker: true },
   ],
   ratesApiUrl: "",
   ratesApiHeaderName: "",
   ratesApiHeaderValue: "",
-  ratesApiMap: [{ label: "Gold 24K", path: "rates.gold24", suffix: "/g" }],
+  ratesApiMap: [{ key: "gold24", path: "rates.gold24", multiplier: 1 }],
+  smsProvider: "none",
+  twilioSid: "",
+  twilioToken: "",
+  twilioFrom: "",
+  fast2smsKey: "",
+  shiprocketEnabled: false,
+  shiprocketEmail: "",
+  shiprocketPassword: "",
+  shiprocketPickupLocation: "Primary",
+  shiprocketPickupPincode: "302003",
   webhooks: [],
   customHead: "",
   customBody: "",
 };
 
+export const DEFAULT_COMMERCE: CommerceSettings = {
+  gstPercent: 3,
+  gstin: "",
+  legalName: "Kaaya Fine Jewellery Pvt. Ltd.",
+  businessState: "Rajasthan",
+  invoicePrefix: "KY/INV/",
+  hsnCode: "7113",
+  giftWrapEnabled: true,
+  giftWrapFee: 250,
+  emiEnabled: true,
+  emiMinAmount: 10000,
+  emiMonths: [3, 6, 9, 12],
+  emiInterestPercent: 0,
+  returnWindowDays: 15,
+  exchangeEnabled: true,
+  returnPolicy: "Ready-to-wear pieces can be returned within 15 days of delivery in original condition with tags and certificate. Engraved and made-to-order pieces can be exchanged at 100% of gold value.",
+  deliveryMode: "rules",
+  deliveryAllPincodes: true,
+  deliveryPincodePrefixes: "",
+  deliveryExpressPrefixes: "110, 400, 560, 600, 700, 500, 302, 411, 380",
+  deliveryStandardDays: 6,
+  deliveryExpressDays: 3,
+  deliveryCodMax: 50000,
+  appointmentSlots: ["11:00", "12:30", "14:00", "15:30", "17:00", "18:30"],
+  appointmentDaysAhead: 21,
+  tryAtHomeEnabled: true,
+  tryAtHomePincodes: "302, 110, 400, 560",
+  videoConsultEnabled: true,
+  reviewsAutoApprove: false,
+  ringSizes: ["6", "8", "10", "12", "14", "16", "18", "20", "22", "24"],
+};
+
 export const SETTING_DEFAULTS = {
+  commerce: DEFAULT_COMMERCE,
   site: DEFAULT_SITE,
   theme: DEFAULT_THEME,
   navigation: DEFAULT_NAV,
@@ -298,4 +392,4 @@ export type SettingKey = keyof typeof SETTING_DEFAULTS;
 export type SettingValue<K extends SettingKey> = (typeof SETTING_DEFAULTS)[K];
 
 /** Keys of integrations that must never leave the server. */
-export const SECRET_INTEGRATION_KEYS: (keyof Integrations)[] = ["razorpayKeySecret", "smtpPass", "ratesApiHeaderValue"];
+export const SECRET_INTEGRATION_KEYS: (keyof Integrations)[] = ["razorpayKeySecret", "smtpPass", "ratesApiHeaderValue", "twilioToken", "fast2smsKey", "shiprocketPassword"];
