@@ -9,7 +9,8 @@
     "lint": "tsc --noEmit",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "setup": "prisma db push && tsx prisma/seed.ts"
+    "setup": "node scripts/ensure-env.mjs && prisma db push && tsx prisma/seed.ts",
+    "predev": "node scripts/ensure-env.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

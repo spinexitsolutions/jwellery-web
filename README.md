@@ -14,9 +14,8 @@ A premium jewellery storefront with an interactive 3D hero and scroll animations
 ## Quick start
 
 ```bash
-cp .env.example .env      # then edit AUTH_SECRET and the admin credentials
 npm install
-npm run setup             # creates the database and seeds demo content
+npm run setup             # creates .env (if missing), the database and demo content
 npm run dev
 ```
 
