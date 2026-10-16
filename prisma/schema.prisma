@@ -1,0 +1,153 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         String   @default("admin") // admin | editor
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+/// Key/value store for site settings, theme, navigation, integrations. Value is JSON.
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+/// CMS page made of ordered sections (JSON array of { id, type, hidden, data }).
+model Page {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  title          String
+  sections       String   @default("[]")
+  seoTitle       String?
+  seoDescription String?
+  published      Boolean  @default(true)
+  showInNav      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Collection {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  tagline     String?
+  description String?
+  image       String?
+  featured    Boolean   @default(false)
+  sortOrder   Int       @default(0)
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Product {
+  id               String      @id @default(cuid())
+  name             String
+  slug             String      @unique
+  sku              String?
+  shortDescription String?
+  description      String?
+  price            Float
+  compareAtPrice   Float?
+  images           String      @default("[]") // JSON string[]
+  metal            String?
+  purity           String?
+  gemstone         String?
+  weight           String?
+  details          String      @default("[]") // JSON {label,value}[]
+  tags             String?
+  stock            Int         @default(10)
+  featured         Boolean     @default(false)
+  published        Boolean     @default(true)
+  sortOrder        Int         @default(0)
+  collectionId     String?
+  collection       Collection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+}
+
+model Post {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  excerpt     String?
+  content     String    @default("")
+  coverImage  String?
+  author      String?
+  category    String?
+  published   Boolean   @default(true)
+  publishedAt DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Order {
+  id              String   @id @default(cuid())
+  number          String   @unique
+  customerName    String
+  email           String
+  phone           String
+  address         String // JSON
+  items           String // JSON
+  subtotal        Float
+  shipping        Float    @default(0)
+  total           Float
+  status          String   @default("pending") // pending | confirmed | shipped | delivered | cancelled
+  paymentMethod   String   @default("cod") // cod | razorpay
+  paymentStatus   String   @default("unpaid") // unpaid | paid | failed | refunded
+  razorpayOrderId String?
+  paymentId       String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Inquiry {
+  id        String   @id @default(cuid())
+  type      String   @default("contact") // contact | appointment | product
+  name      String
+  email     String
+  phone     String?
+  subject   String?
+  message   String
+  status    String   @default("new") // new | read | replied | archived
+  createdAt DateTime @default(now())
+}
+
+model Subscriber {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+}
+
+model Media {
+  id        String   @id @default(cuid())
+  url       String
+  name      String
+  type      String
+  size      Int
+  alt       String?
+  createdAt DateTime @default(now())
+}
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  name       String
+  prefix     String
+  hash       String    @unique
+  scopes     String    @default("read") // comma separated: read,write
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+}
