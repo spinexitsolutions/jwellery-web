@@ -80,6 +80,10 @@ curl https://yoursite.com/api/v1/products -H "x-api-key: kya_…"
 
 `GET /api/v1/{products|collections|posts|pages}[/:idOrSlug]`, `GET /api/v1/settings`, and with a write-scoped key `POST/PATCH /api/v1/products`, `GET/PATCH /api/v1/orders`, `POST /api/v1/inquiries`.
 
+## Troubleshooting
+
+- **3D ring not visible:** the ring needs WebGL. If the browser has hardware acceleration off (Chrome/Edge → Settings → System → "Use graphics acceleration when available"), a studio image of the ring is shown instead. Check `chrome://gpu` — WebGL should say "Hardware accelerated". 3D can also be turned off in Admin → Theme.
+
 ## Deployment notes
 
 - SQLite and local uploads (`UPLOAD_DIR`) need a server with a persistent disk, such as a VPS, Railway, Render or Fly.io with a volume.

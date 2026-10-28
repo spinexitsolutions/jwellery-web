@@ -104,6 +104,7 @@ export default function RingScene({
   interactive = false,
   shadow = false,
   bg = "#F3EEE6",
+  onReady,
 }: {
   metal?: string;
   gem?: string;
@@ -111,11 +112,15 @@ export default function RingScene({
   interactive?: boolean;
   shadow?: boolean;
   bg?: string;
+  /** Called once the WebGL context exists and the first frames have rendered. */
+  onReady?: () => void;
 }) {
   // A warm, bright studio environment so gold reads as gold rather than bronze.
   const envTint = metal === "platinum" ? "#8f949c" : metal === "rose" ? "#9c8279" : "#9a8768";
   return (
-    <Canvas dpr={[1, 1.75]} camera={{ position: [0, 0.3, 6.6], fov: 32 }} gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}>
+    <Canvas dpr={[1, 1.75]} camera={{ position: [0, 0.3, 6.6], fov: 32 }} gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+      onCreated={() => requestAnimationFrame(() => requestAnimationFrame(() => onReady?.()))}
+    >
       <ambientLight intensity={0.4} />
       <directionalLight position={[3, 5, 4]} intensity={1.4} />
       <Float speed={interactive ? 0 : 1.6} rotationIntensity={0.2} floatIntensity={interactive ? 0 : 0.6}>
